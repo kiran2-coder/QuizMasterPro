@@ -1,0 +1,26 @@
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <style name="Theme.QuizmasterApp" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <item name="colorPrimary">@color/primary_orange</item>
+        <item name="colorPrimaryVariant">@color/primary_dark</item>
+        <item name="colorOnPrimary">@color/white</item>
+        <item name="colorSecondary">@color/secondary_teal</item>
+        <item name="colorOnSecondary">@color/black</item>
+
+        <item name="android:windowBackground">@color/background</item>
+        <item name="android:statusBarColor" tools:targetApi="l">@color/primary_dark</item>
+
+        <item name="android:forceDarkAllowed">false</item>
+    </style>
+
+    <style name="Theme.QuizmasterApp.Splash" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/primary_orange</item>
+        <item name="windowSplashScreenAnimatedIcon">@android:color/transparent</item>
+        <item name="windowSplashScreenAnimationDuration">300</item>
+        <item name="postSplashScreenTheme">@style/Theme.QuizmasterApp</item>
+    </style>
+
+    <style name="Theme.QuizmasterApp.NoActionBar" parent="Theme.QuizmasterApp">
+        <item name="windowActionBar">false</item>
+        <item name="windowNoTitle">true</item>
+    </style>
+</resources>

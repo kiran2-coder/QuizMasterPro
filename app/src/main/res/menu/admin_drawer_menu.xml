@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <group android:checkableBehavior="single">
+        <item
+            android:id="@+id/nav_manage_users"
+            android:title="👥 Manage Users" />
+        <item
+            android:id="@+id/nav_my_profile"
+            android:title="👤 My Profile" />
+        <item
+            android:id="@+id/nav_change_password"
+            android:title="🔐 Change Password" />
+    </group>
+
+    <item android:title="Account Actions">
+        <menu>
+            <item
+                android:id="@+id/nav_logout"
+                android:icon="@android:drawable/ic_menu_close_clear_cancel"
+                android:title="🚪 Logout" />
+        </menu>
+    </item>
+</menu>
