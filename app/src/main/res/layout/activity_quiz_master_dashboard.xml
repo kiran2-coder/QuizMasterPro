@@ -19,8 +19,6 @@
 
     </com.google.android.material.appbar.AppBarLayout>
 
-
-
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent"
@@ -50,6 +48,7 @@
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:layout_marginBottom="16dp"
             app:cardCornerRadius="12dp"
             app:cardElevation="4dp">
 
@@ -57,7 +56,26 @@
                 android:id="@+id/btnViewHighScores"
                 android:layout_width="match_parent"
                 android:layout_height="64dp"
-                android:text="📊 View High Scores"
+                android:text="📊 View Category Records"
+                android:textSize="18sp"
+                android:textAllCaps="false"
+                android:background="@android:color/transparent"
+                android:textColor="@color/black" />
+
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- New Leaderboard Button -->
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            app:cardCornerRadius="12dp"
+            app:cardElevation="4dp">
+
+            <Button
+                android:id="@+id/btnLeaderboard"
+                android:layout_width="match_parent"
+                android:layout_height="64dp"
+                android:text="🏆 View Global Leaderboard"
                 android:textSize="18sp"
                 android:textAllCaps="false"
                 android:background="@android:color/transparent"

@@ -300,7 +300,7 @@ public class QuizActivity extends AppCompatActivity {
 
     private void saveScoreToLeaderboard(String categoryId, int score, int percentage) {
         String currentUserId = FirebaseAuth.getInstance().getUid();
-        String categoryName = getIntent().getStringExtra("categoryName"); // Get the human-readable name
+        String categoryName = getIntent().getStringExtra("categoryName");// Get the human-readable name
 
         db.collection("users").document(currentUserId).get()
                 .addOnSuccessListener(documentSnapshot -> {

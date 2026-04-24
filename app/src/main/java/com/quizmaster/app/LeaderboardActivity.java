@@ -1,10 +1,12 @@
 package com.quizmaster.app;
 
-import android.content.Intent;
 import android.os.Bundle;
 import android.view.MenuItem;
+import android.view.View;
+import android.widget.Toast;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.recyclerview.widget.LinearLayoutManager;
+import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.Query;
@@ -27,21 +29,44 @@ public class LeaderboardActivity extends AppCompatActivity {
         db = FirebaseFirestore.getInstance();
         topScores = new ArrayList<>();
 
-        // 🔥 NO TOOLBAR BACK BUTTON - DISABLED
         if (getSupportActionBar() != null) {
-            getSupportActionBar().setDisplayHomeAsUpEnabled(false);  // HIDE back arrow
+            getSupportActionBar().setDisplayHomeAsUpEnabled(false);
             getSupportActionBar().setDisplayShowHomeEnabled(false);
-            getSupportActionBar().setTitle("🏆 TOP 10 LEADERBOARD");
+            getSupportActionBar().setTitle("🏆 GLOBAL LEADERBOARD");
         }
 
         setupRecyclerView();
         loadTopScores();
 
-        // 🔥 ONLY THIS BUTTON WORKS → UserDashboardActivity
-        binding.btnBack.setOnClickListener(v -> {
-            startActivity(new Intent(this, UserDashboardActivity.class));
+        // 🔥 FIXED: Back button now checks user role before navigating
+        binding.btnBack.setOnClickListener(v -> handleBackNavigation());
+    }
+
+    private void handleBackNavigation() {
+        String uid = FirebaseAuth.getInstance().getUid();
+        if (uid == null) {
             finish();
-        });
+            return;
+        }
+
+        db.collection("users").document(uid).get()
+                .addOnSuccessListener(documentSnapshot -> {
+                    String role = documentSnapshot.getString("role");
+                    if ("quizmaster".equalsIgnoreCase(role)) {
+                        // Go back to QuizMaster Dashboard
+                        finish(); 
+                    } else if ("admin".equalsIgnoreCase(role)) {
+                        // Go back to Admin Dashboard
+                        finish();
+                    } else {
+                        // Default for users
+                        finish();
+                    }
+                })
+                .addOnFailureListener(e -> {
+                    // Fallback to simply closing the activity
+                    finish();
+                });
     }
 
     private void setupRecyclerView() {
@@ -50,13 +75,12 @@ public class LeaderboardActivity extends AppCompatActivity {
         binding.rvLeaderboard.setAdapter(adapter);
     }
 
-
-
     private void loadTopScores() {
-        binding.tvLoading.setText("Loading top scores...");
+        binding.tvLoading.setVisibility(View.VISIBLE);
+        binding.tvLoading.setText("Fetching Top 10 by Percentage...");
 
         db.collection("leaderboards")
-                .orderBy("score", Query.Direction.DESCENDING)
+                .orderBy("percentage", Query.Direction.DESCENDING)
                 .limit(10)
                 .get()
                 .addOnSuccessListener(querySnapshot -> {
@@ -68,16 +92,21 @@ public class LeaderboardActivity extends AppCompatActivity {
                         }
                     }
                     adapter.notifyDataSetChanged();
-                    binding.tvLoading.setVisibility(android.view.View.GONE);
+                    binding.tvLoading.setVisibility(View.GONE);
+
+                    if (topScores.isEmpty()) {
+                        binding.tvLoading.setVisibility(View.VISIBLE);
+                        binding.tvLoading.setText("No scores found yet. Be the first!");
+                    }
                 })
                 .addOnFailureListener(e -> {
-                    binding.tvLoading.setText("No scores yet");
+                    binding.tvLoading.setVisibility(View.VISIBLE);
+                    binding.tvLoading.setText("Failed to load leaderboard.");
                 });
     }
 
-    // 🔥 DISABLE TOOLBAR BACK - EMPTY METHOD
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
-        return super.onOptionsItemSelected(item);  // NO back arrow handling
+        return super.onOptionsItemSelected(item);
     }
 }

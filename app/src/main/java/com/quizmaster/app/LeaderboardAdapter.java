@@ -26,15 +26,22 @@ public class LeaderboardAdapter extends RecyclerView.Adapter<LeaderboardAdapter.
     @Override
     public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
         ScoreModel score = scores.get(position);
-        holder.tvRank.setText((position + 1) + " 🥇".substring(0, Math.min(2, position + 1)));
-        holder.tvUsername.setText(score.username);
-        holder.tvScore.setText(score.score + "/" + score.percentage + "%");
-        holder.tvCategory.setText(score.category.toUpperCase());
+        
+        // Dynamic Rank Display
+        String rankStr = String.valueOf(position + 1);
+        if (position == 0) rankStr += " 🥇";
+        else if (position == 1) rankStr += " 🥈";
+        else if (position == 2) rankStr += " 🥉";
+        
+        holder.tvRank.setText(rankStr);
+        holder.tvUsername.setText(score.username != null ? score.username : "Unknown");
+        holder.tvScore.setText(score.score + " pts (" + score.percentage + "%)");
+        holder.tvCategory.setText(score.category != null ? score.category.toUpperCase() : "GENERAL");
     }
 
     @Override
     public int getItemCount() {
-        return scores.size();
+        return scores != null ? scores.size() : 0;
     }
 
     static class ViewHolder extends RecyclerView.ViewHolder {

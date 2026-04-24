@@ -18,7 +18,6 @@ public class HighScoreAdapter extends RecyclerView.Adapter<HighScoreAdapter.View
     @NonNull
     @Override
     public ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-        // Ensure R.layout.item_high_score exists in res/layout/
         View view = LayoutInflater.from(parent.getContext()).inflate(R.layout.item_high_score, parent, false);
         return new ViewHolder(view);
     }
@@ -27,16 +26,14 @@ public class HighScoreAdapter extends RecyclerView.Adapter<HighScoreAdapter.View
     public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
         ScoreModel model = scoreList.get(position);
 
-        // Check if we are in QuizMaster mode or User mode
-        // For QuizMaster, we want to see WHO scored.
-        if (model.username != null) {
-            holder.tvCategory.setText(model.username); // Using the tvCategory field to show name
-        } else {
-            holder.tvCategory.setText(model.category);
-        }
-
+        // Display username and category for global leaderboard
+        String displayText = (model.username != null ? model.username : "Unknown") 
+                + " [" + (model.category != null ? model.category : "N/A") + "]";
+        
+        holder.tvCategory.setText(displayText);
         holder.tvScore.setText(model.score + " pts (" + model.percentage + "%)");
     }
+
     @Override
     public int getItemCount() {
         return scoreList != null ? scoreList.size() : 0;
