@@ -1,6 +1,7 @@
 package com.quizmaster.app;
 
 import android.app.AlertDialog;
+import android.text.InputType;
 import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.Toast;
@@ -72,19 +73,32 @@ public class AddQuestionsActivity extends AppCompatActivity {
 
         final EditText etQuestion = new EditText(this);
         etQuestion.setText(question.question);
+        // 🔥 CHANGED: Use CAP_SENTENCES instead of CAP_WORDS for the question
+        etQuestion.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES | InputType.TYPE_TEXT_FLAG_MULTI_LINE);
+
         final EditText etA = new EditText(this);
         etA.setText(question.options.get("A"));
+        etA.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
+
         final EditText etB = new EditText(this);
         etB.setText(question.options.get("B"));
+        etB.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
+
         final EditText etC = new EditText(this);
         etC.setText(question.options.get("C"));
+        etC.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
+
         final EditText etD = new EditText(this);
         etD.setText(question.options.get("D"));
+        etD.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
+
         final EditText etCorrect = new EditText(this);
         etCorrect.setText(question.correctAnswer);
+        etCorrect.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS); // Correct answer usually 'A', 'B', etc.
 
         LinearLayout layout = new LinearLayout(this);
         layout.setOrientation(LinearLayout.VERTICAL);
+        layout.setPadding(50, 40, 50, 40);
         layout.addView(etQuestion);
         layout.addView(etA);
         layout.addView(etB);
@@ -95,12 +109,13 @@ public class AddQuestionsActivity extends AppCompatActivity {
 
         builder.setPositiveButton("UPDATE", (dialog, which) -> {
             Map<String, String> options = new HashMap<>();
-            options.put("A", etA.getText().toString());
-            options.put("B", etB.getText().toString());
-            options.put("C", etC.getText().toString());
-            options.put("D", etD.getText().toString());
+            options.put("A", etA.getText().toString().trim());
+            options.put("B", etB.getText().toString().trim());
+            options.put("C", etC.getText().toString().trim());
+            options.put("D", etD.getText().toString().trim());
 
-            updateQuestion(question.id, etQuestion.getText().toString(), options, etCorrect.getText().toString());
+            String questionText = etQuestion.getText().toString().trim();
+            updateQuestion(question.id, formatSentence(questionText), options, etCorrect.getText().toString().trim());
         });
         builder.setNegativeButton("CANCEL", null);
         builder.show();
@@ -142,19 +157,32 @@ public class AddQuestionsActivity extends AppCompatActivity {
 
         final EditText etQuestion = new EditText(this);
         etQuestion.setHint("What is 2+2?");
+        // 🔥 CHANGED: Use CAP_SENTENCES instead of CAP_WORDS for the question
+        etQuestion.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES | InputType.TYPE_TEXT_FLAG_MULTI_LINE);
+
         final EditText etA = new EditText(this);
         etA.setHint("A) 3");
+        etA.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
+
         final EditText etB = new EditText(this);
         etB.setHint("B) 4");
+        etB.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
+
         final EditText etC = new EditText(this);
         etC.setHint("C) 5");
+        etC.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
+
         final EditText etD = new EditText(this);
         etD.setHint("D) 6");
+        etD.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
+
         final EditText etCorrect = new EditText(this);
         etCorrect.setHint("Correct: B");
+        etCorrect.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS);
 
         LinearLayout layout = new LinearLayout(this);
         layout.setOrientation(LinearLayout.VERTICAL);
+        layout.setPadding(50, 40, 50, 40);
         layout.addView(etQuestion);
         layout.addView(etA);
         layout.addView(etB);
@@ -164,16 +192,16 @@ public class AddQuestionsActivity extends AppCompatActivity {
         builder.setView(layout);
 
         builder.setPositiveButton("ADD", (dialog, which) -> {
-            String question = etQuestion.getText().toString().trim();
-            if (!question.isEmpty()) {
+            String questionText = etQuestion.getText().toString().trim();
+            if (!questionText.isEmpty()) {
                 Map<String, String> options = new HashMap<>();
-                options.put("A", etA.getText().toString());
-                options.put("B", etB.getText().toString());
-                options.put("C", etC.getText().toString());
-                options.put("D", etD.getText().toString());
+                options.put("A", etA.getText().toString().trim());
+                options.put("B", etB.getText().toString().trim());
+                options.put("C", etC.getText().toString().trim());
+                options.put("D", etD.getText().toString().trim());
 
                 String correct = etCorrect.getText().toString().trim();
-                addQuestion(question, options, correct);
+                addQuestion(formatSentence(questionText), options, correct);
             }
         });
         builder.setNegativeButton("CANCEL", null);
@@ -213,5 +241,11 @@ public class AddQuestionsActivity extends AppCompatActivity {
                     db.collection("categories").document(categoryId)
                             .update("questionCount", count);
                 });
+    }
+
+    // Helper to capitalize only the first letter of the string
+    private String formatSentence(String input) {
+        if (input == null || input.isEmpty()) return input;
+        return input.substring(0, 1).toUpperCase() + input.substring(1);
     }
 }

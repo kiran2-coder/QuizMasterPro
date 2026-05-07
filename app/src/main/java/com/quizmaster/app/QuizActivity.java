@@ -34,11 +34,18 @@ public class QuizActivity extends AppCompatActivity {
     private FirebaseFirestore db;
     private List<QuestionModel> questions;
     private int currentQuestionIndex = 0;
-    private int score = 0;
+    private float score = 0; // 🔥 CHANGED: Support float for negative marking
+    private int attemptedCount = 0;
+    private int skippedCount = 0;
     private CountDownTimer quizTimer;
     private long totalQuizTimeMs;
     private boolean isQuizActive = true;
+    private boolean isQuizEnded = false;
     private String categoryId;
+
+    // 🔥 NEGATIVE MARKING SETTINGS
+    private boolean isNegativeMarkingEnabled = false;
+    private float negativeMarks = 0.0f;
 
     // List to manage buttons collectively for styling resets
     private List<MaterialButton> optionButtons;
@@ -63,6 +70,10 @@ public class QuizActivity extends AppCompatActivity {
         categoryId = getIntent().getStringExtra("categoryId");
         String categoryName = getIntent().getStringExtra("categoryName");
         int timeLimitMinutes = getIntent().getIntExtra("timeLimit", 15);
+        
+        // 🔥 LOAD NEGATIVE MARKING SETTINGS
+        isNegativeMarkingEnabled = getIntent().getBooleanExtra("negativeMarking", false);
+        negativeMarks = getIntent().getFloatExtra("negativeMarks", 0.0f);
 
         if (categoryId == null) {
             Toast.makeText(this, "Invalid category!", Toast.LENGTH_SHORT).show();
@@ -74,7 +85,6 @@ public class QuizActivity extends AppCompatActivity {
         setSupportActionBar(binding.toolbar);
         if (getSupportActionBar() != null) {
             getSupportActionBar().setDisplayHomeAsUpEnabled(true);
-            // Display "Science (15min)" or similar
             getSupportActionBar().setTitle(categoryName != null ? categoryName : "Quiz");
 
             binding.toolbar.setNavigationOnClickListener(v -> showExitConfirmationDialog());
@@ -100,8 +110,6 @@ public class QuizActivity extends AppCompatActivity {
     }
 
     private void loadQuestions(String categoryId) {
-        // No need for "Loading" text updates here if it's instant,
-        // but good to have as a fallback for slow networks.
         db.collection("categories").document(categoryId)
                 .collection("questions")
                 .orderBy("timestamp", Query.Direction.DESCENDING)
@@ -127,8 +135,6 @@ public class QuizActivity extends AppCompatActivity {
                     }
 
                     Collections.shuffle(questions);
-
-                    // 🔥 INSTANT START: No Handlers, no delays.
                     startQuiz();
 
                 })
@@ -142,7 +148,6 @@ public class QuizActivity extends AppCompatActivity {
         showQuestion(0);
     }
     private void showExitConfirmationDialog() {
-        // Use the AppCompat version for consistent styling
         androidx.appcompat.app.AlertDialog.Builder builder = new androidx.appcompat.app.AlertDialog.Builder(this);
         builder.setTitle("Quit Quiz?");
         builder.setMessage("Your progress will be lost. Are you sure you want to exit?");
@@ -169,13 +174,21 @@ public class QuizActivity extends AppCompatActivity {
 
             @Override
             public void onFinish() {
-                isQuizActive = false;
-                showResults();
+                if (isQuizActive) {
+                    isQuizActive = false;
+                    skippedCount++;
+                    highlightCorrectAnswer();
+                    new Handler(Looper.getMainLooper()).postDelayed(() -> showResults(), 2000);
+                } else {
+                    showResults();
+                }
             }
         }.start();
     }
 
     private void showQuestion(int index) {
+        if (isQuizEnded) return;
+
         if (index >= questions.size()) {
             quizTimer.cancel();
             showResults();
@@ -189,8 +202,9 @@ public class QuizActivity extends AppCompatActivity {
         binding.tvQuestion.setText(question.question);
         binding.tvProgress.setText((index + 1) + "/" + questions.size());
 
-        // --- MAPPING LOGIC START ---
-        // Extract the text that matches the letter in the DB
+        binding.btnSkip.setVisibility(View.VISIBLE);
+        binding.btnSkip.setEnabled(true);
+
         switch (question.correctAnswer.toUpperCase().trim()) {
             case "A": currentCorrectText = question.optionA; break;
             case "B": currentCorrectText = question.optionB; break;
@@ -198,7 +212,6 @@ public class QuizActivity extends AppCompatActivity {
             case "D": currentCorrectText = question.optionD; break;
             default: currentCorrectText = ""; break;
         }
-        // --- MAPPING LOGIC END ---
 
         List<String> options = new ArrayList<>();
         options.add(question.optionA);
@@ -207,13 +220,11 @@ public class QuizActivity extends AppCompatActivity {
         options.add(question.optionD);
         Collections.shuffle(options);
 
-        // Populate buttons as you already do...
         for (int i = 0; i < optionButtons.size(); i++) {
             MaterialButton btn = optionButtons.get(i);
             btn.setText(options.get(i));
             btn.setVisibility(View.VISIBLE);
             btn.setEnabled(true);
-            // Reset colors
             btn.setStrokeColorResource(R.color.border_color);
             btn.setBackgroundTintList(ColorStateList.valueOf(ContextCompat.getColor(this, android.R.color.transparent)));
             btn.setTextColor(ContextCompat.getColor(this, R.color.text_primary));
@@ -224,34 +235,44 @@ public class QuizActivity extends AppCompatActivity {
         for (MaterialButton btn : optionButtons) {
             btn.setOnClickListener(v -> checkAnswer(btn));
         }
+
+        binding.btnSkip.setOnClickListener(v -> {
+            if (!isQuizActive) return;
+            isQuizActive = false;
+            skippedCount++;
+            highlightCorrectAnswer();
+            new Handler(Looper.getMainLooper()).postDelayed(() -> {
+                showQuestion(currentQuestionIndex + 1);
+            }, 1500);
+        });
     }
 
     private void checkAnswer(MaterialButton selectedBtn) {
         if (!isQuizActive) return;
 
         isQuizActive = false;
+        attemptedCount++;
+        binding.btnSkip.setEnabled(false);
         for (MaterialButton btn : optionButtons) btn.setEnabled(false);
 
         String selectedText = selectedBtn.getText().toString();
-
-        // Direct comparison with the mapped text
         boolean isCorrect = selectedText.equals(currentCorrectText);
 
         if (isCorrect) {
-            score++;
+            score += 1.0f; // Add 1 mark for correct
             selectedBtn.setBackgroundTintList(ColorStateList.valueOf(ContextCompat.getColor(this, R.color.success)));
             selectedBtn.setTextColor(ContextCompat.getColor(this, R.color.white));
         } else {
+            // 🔥 APPLY NEGATIVE MARKING
+            if (isNegativeMarkingEnabled) {
+                score -= negativeMarks;
+                // Ensure score doesn't go below 0
+                if (score < 0) score = 0;
+            }
+            
             selectedBtn.setBackgroundTintList(ColorStateList.valueOf(ContextCompat.getColor(this, R.color.error)));
             selectedBtn.setTextColor(ContextCompat.getColor(this, R.color.white));
-
-            // Highlight the right one by looking for the correct text
-            for (MaterialButton btn : optionButtons) {
-                if (btn.getText().toString().equals(currentCorrectText)) {
-                    btn.setBackgroundTintList(ColorStateList.valueOf(ContextCompat.getColor(this, R.color.success)));
-                    btn.setTextColor(ContextCompat.getColor(this, R.color.white));
-                }
-            }
+            highlightCorrectAnswer();
         }
 
         new Handler(Looper.getMainLooper()).postDelayed(() -> {
@@ -259,13 +280,41 @@ public class QuizActivity extends AppCompatActivity {
         }, 1500);
     }
 
+    private void highlightCorrectAnswer() {
+        for (MaterialButton btn : optionButtons) {
+            btn.setEnabled(false);
+            if (btn.getText().toString().equals(currentCorrectText)) {
+                btn.setBackgroundTintList(ColorStateList.valueOf(ContextCompat.getColor(this, R.color.success)));
+                btn.setTextColor(ContextCompat.getColor(this, R.color.white));
+            }
+        }
+        binding.btnSkip.setEnabled(false);
+    }
+
     private void showResults() {
+        if (isQuizEnded) return;
+        isQuizEnded = true;
+
         if (quizTimer != null) quizTimer.cancel();
         isQuizActive = false;
+        
+        // Percentage based on correct answers (score might be lower due to negative marking)
+        // But usually percentage is (Final Score / Max Score) * 100
         int percentage = questions.isEmpty() ? 0 : (int) ((score * 100.0) / questions.size());
+        if (percentage < 0) percentage = 0;
 
-        binding.tvQuestion.setText("Quiz Complete! 🎉\nScore: " + score + "/" + questions.size() + " (" + percentage + "%)");
+        String scoreDisplay = String.format("%.2f", score).replaceAll("\\.00$", "");
 
+        String resultText = "Quiz Complete! 🎉\n\n" +
+                "Final Score: " + scoreDisplay + "/" + questions.size() + " (" + percentage + "%)\n" +
+                "Attempted: " + attemptedCount + "\n" +
+                "Skipped: " + skippedCount;
+        
+        if (isNegativeMarkingEnabled) {
+            resultText += "\n(Negative Marking: -" + negativeMarks + " per wrong)";
+        }
+        
+        binding.tvQuestion.setText(resultText);
 
         saveScoreToLeaderboard(categoryId, score, percentage);
 
@@ -277,7 +326,6 @@ public class QuizActivity extends AppCompatActivity {
         binding.btnOption1.setText("🏆 Leaderboard");
         binding.btnOption1.setVisibility(View.VISIBLE);
         binding.btnOption1.setEnabled(true);
-        // Navigation styling
         binding.btnOption1.setBackgroundTintList(ColorStateList.valueOf(ContextCompat.getColor(this, R.color.primary)));
         binding.btnOption1.setTextColor(ContextCompat.getColor(this, R.color.white));
         binding.btnOption1.setOnClickListener(v -> startActivity(new Intent(this, LeaderboardActivity.class)));
@@ -288,57 +336,48 @@ public class QuizActivity extends AppCompatActivity {
         binding.btnOption2.setBackgroundTintList(ColorStateList.valueOf(ContextCompat.getColor(this, R.color.secondary_teal)));
         binding.btnOption2.setTextColor(ContextCompat.getColor(this, R.color.white));
 
-        // 🔥 REDIRECT TO USER DASHBOARD
         binding.btnOption2.setOnClickListener(v -> {
             Intent intent = new Intent(QuizActivity.this, UserDashboardActivity.class);
-            // Clear the backstack so the user can't "Go Back" into the finished quiz
             intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_NEW_TASK);
             startActivity(intent);
-            finish(); // Close the QuizActivity
+            finish();
         });
     }
 
-    private void saveScoreToLeaderboard(String categoryId, int score, int percentage) {
+    private void saveScoreToLeaderboard(String categoryId, float finalScore, int percentage) {
         String currentUserId = FirebaseAuth.getInstance().getUid();
-        String categoryName = getIntent().getStringExtra("categoryName");// Get the human-readable name
+        String categoryName = getIntent().getStringExtra("categoryName");
 
         db.collection("users").document(currentUserId).get()
                 .addOnSuccessListener(documentSnapshot -> {
                     String realName = documentSnapshot.getString("name");
                     if (realName == null) realName = "Anonymous";
 
-                    // Create the data object using your ScoreModel
-                    // We use the categoryName (e.g., "History") for the display,
-                    // but categoryId for logic if needed.
                     ScoreModel scoreModel = new ScoreModel(
                             currentUserId,
                             realName,
                             categoryName != null ? categoryName : "General",
                             categoryId,
-                            score,
-                            percentage
+                            finalScore,
+                            percentage,
+                            attemptedCount,
+                            skippedCount
                     );
                     scoreModel.timestamp = com.google.firebase.Timestamp.now();
 
-                    // 🔥 HIGH SCORE LOGIC:
-                    // We save to a specific document: "USERID_CATEGORYID"
-                    // This will overwrite the previous score for this specific category.
                     String docId = currentUserId + "_" + categoryId;
 
-                    // Inside saveScoreToLeaderboard
                     db.collection("scores").document(docId).get().addOnSuccessListener(doc -> {
-                        int existingScore = 0;
+                        float existingScore = 0;
                         if (doc.exists() && doc.contains("score")) {
-                            existingScore = doc.getLong("score").intValue();
+                            existingScore = doc.getDouble("score").floatValue();
                         }
 
-                        // Only update if the new score is higher
-                        if (score > existingScore) {
+                        if (finalScore > existingScore) {
                             db.collection("scores").document(docId).set(scoreModel);
                         }
                     });
 
-                    // Keep your existing leaderboard code if you want a history of all attempts
                     db.collection("leaderboards")
                             .document(currentUserId + "_" + System.currentTimeMillis())
                             .set(scoreModel);
@@ -347,6 +386,7 @@ public class QuizActivity extends AppCompatActivity {
 
     private void hideAllButtons() {
         for (MaterialButton btn : optionButtons) btn.setVisibility(View.GONE);
+        binding.btnSkip.setVisibility(View.GONE);
     }
 
     @Override
@@ -354,5 +394,4 @@ public class QuizActivity extends AppCompatActivity {
         super.onDestroy();
         if (quizTimer != null) quizTimer.cancel();
     }
-
 }

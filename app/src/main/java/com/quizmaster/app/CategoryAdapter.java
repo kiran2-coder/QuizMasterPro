@@ -11,7 +11,7 @@ import java.util.ArrayList;
 public class CategoryAdapter extends RecyclerView.Adapter<CategoryAdapter.CategoryViewHolder> {
     private ArrayList<CategoryModel> categories;
     private OnCategoryClickListener listener;
-    private boolean isAdminMode = false;  // ✅ FIX 1: Add this flag
+    private boolean isAdminMode = false;
 
     public interface OnCategoryClickListener {
         void onCategoryClick(CategoryModel category);
@@ -28,7 +28,6 @@ public class CategoryAdapter extends RecyclerView.Adapter<CategoryAdapter.Catego
         notifyDataSetChanged();
     }
 
-    // ✅ FIX 2: Set admin mode (call from Activities)
     public void setAdminMode(boolean adminMode) {
         this.isAdminMode = adminMode;
         notifyDataSetChanged();
@@ -46,15 +45,24 @@ public class CategoryAdapter extends RecyclerView.Adapter<CategoryAdapter.Catego
     public void onBindViewHolder(@NonNull CategoryViewHolder holder, int position) {
         CategoryModel category = categories.get(position);
 
-        // ✅ FIX 3: Use tvName (matches layout)
-        holder.tvName.setText(category.name + " (" +
-                category.questionCount + " questions - " +
-                category.timeLimit + "min)");
+        holder.tvName.setText(category.name);
+        
+        // Show negative marking info if enabled
+        String negativeInfo = "";
+        if (category.negativeMarking) {
+            negativeInfo = " | Neg: -" + category.negativeMarks;
+        }
+
+        holder.tvQuestionCount.setText(category.questionCount + " Questions | " +
+                category.timeLimit + " min" + negativeInfo);
 
         holder.itemView.setOnClickListener(v -> listener.onCategoryClick(category));
         holder.itemView.setOnLongClickListener(v -> {
-            listener.onCategoryDelete(category);
-            return true;
+            if (isAdminMode) {
+                listener.onCategoryDelete(category);
+                return true;
+            }
+            return false;
         });
     }
 

@@ -37,6 +37,9 @@ public class QuizSelectionActivity extends AppCompatActivity {
                 intent.putExtra("categoryId", category.customId);  // "science"
                 intent.putExtra("categoryName", category.name);
                 intent.putExtra("timeLimit", category.timeLimit);
+                // 🔥 ADDED: Pass negative marking settings
+                intent.putExtra("negativeMarking", category.negativeMarking);
+                intent.putExtra("negativeMarks", category.negativeMarks);
                 startActivity(intent);
             }
 

@@ -2,8 +2,9 @@ package com.quizmaster.app;
 
 import android.content.Intent;
 import android.app.AlertDialog;
+import android.widget.CheckBox;
 import android.widget.EditText;
-import android.widget.LinearLayout;  // ✅ ADD THIS
+import android.widget.LinearLayout;
 import android.widget.Toast;
 import android.os.Bundle;
 import androidx.appcompat.app.AppCompatActivity;
@@ -35,7 +36,7 @@ public class CategoriesActivity extends AppCompatActivity {
         binding.toolbar.setNavigationOnClickListener(v -> finish());
 
         setupRecyclerView();
-        loadCategories();  // 🔥 FIXED: This loads ALL counts
+        loadCategories();
 
         binding.btnAddCategory.setOnClickListener(v -> showAddCategoryDialog());
     }
@@ -52,12 +53,12 @@ public class CategoriesActivity extends AppCompatActivity {
 
             @Override
             public void onCategoryDelete(CategoryModel category) {
-                showDeleteCategoryDialog(category);  // 🔥 DELETE DIALOG
+                showDeleteCategoryDialog(category);
             }
         });
         binding.rvCategories.setLayoutManager(new LinearLayoutManager(this));
         binding.rvCategories.setAdapter(categoryAdapter);
-        categoryAdapter.setAdminMode(true);  // Admin sees delete
+        categoryAdapter.setAdminMode(true);
 
     }
 
@@ -71,11 +72,9 @@ public class CategoriesActivity extends AppCompatActivity {
     }
 
     private void deleteCategory(String categoryId) {
-        // Delete all questions first
         db.collection("categories").document(categoryId)
                 .collection("questions").get()
                 .addOnSuccessListener(querySnapshot -> {
-                    // Batch delete all questions
                     WriteBatch batch = db.batch();
                     for (DocumentSnapshot doc : querySnapshot) {
                         batch.delete(doc.getReference());
@@ -95,8 +94,6 @@ public class CategoriesActivity extends AppCompatActivity {
                 .get()
                 .addOnSuccessListener(querySnapshot -> {
                     categories.clear();
-
-                    // 🔥 INSTANT LOAD - Show immediately
                     for (DocumentSnapshot doc : querySnapshot) {
                         CategoryModel category = doc.toObject(CategoryModel.class);
                         if (category != null) {
@@ -104,11 +101,8 @@ public class CategoriesActivity extends AppCompatActivity {
                             categories.add(category);
                         }
                     }
-
-                    // 🔥 UPDATE UI IMMEDIATELY (0.1s)
                     categoryAdapter.updateCategories(categories);
-
-                    // 🔥 BACKGROUND: Update counts silently
+                    // Force update question counts from subcollections in case doc count is wrong
                     updateAllQuestionCounts();
                 });
     }
@@ -121,53 +115,54 @@ public class CategoriesActivity extends AppCompatActivity {
             db.collection("categories").document(category.id)
                     .collection("questions").get()
                     .addOnSuccessListener(querySnapshot -> {
+                        int actualCount = querySnapshot.size();
                         if (index < categories.size()) {
-                            categories.get(index).questionCount = querySnapshot.size();
-                            categoryAdapter.notifyItemChanged(index);  // Only 1 item updates
+                            categories.get(index).questionCount = actualCount;
+                            categoryAdapter.notifyItemChanged(index);
                         }
+                        // Also sync the count back to the category document for future fast loads
+                        db.collection("categories").document(category.id)
+                                .update("questionCount", actualCount);
                     });
         }
     }
-
-
-    // 🔥 FIXED: Proper async count loader
-    private void loadQuestionCountForCategory(String categoryId, int index) {
-        db.collection("categories").document(categoryId)
-                .collection("questions").get()
-                .addOnSuccessListener(querySnapshot -> {
-                    if (index < categories.size()) {
-                        categories.get(index).questionCount = querySnapshot.size();
-                        categoryAdapter.notifyItemChanged(index);  // Update specific item
-                    }
-                });
-    }
-
-
 
     private void showAddCategoryDialog() {
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
         builder.setTitle("Create Category");
 
-        // 🔥 NEW: 3 INPUT FIELDS
         LinearLayout layout = new LinearLayout(this);
         layout.setOrientation(LinearLayout.VERTICAL);
         layout.setPadding(50, 40, 50, 40);
 
-        // 1. NAME FIELD
         final EditText etName = new EditText(this);
         etName.setHint("Category Name (e.g. Math)");
+        etName.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_WORDS);
         layout.addView(etName);
 
-        // 2. DESCRIPTION FIELD (keep existing)
         final EditText etDesc = new EditText(this);
         etDesc.setHint("Description (optional)");
+        etDesc.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
         layout.addView(etDesc);
 
-        // 3. TIME LIMIT FIELD ← NEW!
         final EditText etTimeLimit = new EditText(this);
         etTimeLimit.setHint("Time Limit (minutes)");
-        etTimeLimit.setInputType(android.text.InputType.TYPE_CLASS_NUMBER);
+        etTimeLimit.setInputType(InputType.TYPE_CLASS_NUMBER);
         layout.addView(etTimeLimit);
+
+        final CheckBox cbNegative = new CheckBox(this);
+        cbNegative.setText("Enable Negative Marking");
+        layout.addView(cbNegative);
+
+        final EditText etNegativeMarks = new EditText(this);
+        etNegativeMarks.setHint("Deduction (e.g., 0.25)");
+        etNegativeMarks.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
+        etNegativeMarks.setVisibility(android.view.View.GONE);
+        layout.addView(etNegativeMarks);
+
+        cbNegative.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            etNegativeMarks.setVisibility(isChecked ? android.view.View.VISIBLE : android.view.View.GONE);
+        });
 
         builder.setView(layout);
 
@@ -175,24 +170,21 @@ public class CategoriesActivity extends AppCompatActivity {
             String name = etName.getText().toString().trim();
             String desc = etDesc.getText().toString().trim();
             String timeStr = etTimeLimit.getText().toString().trim();
+            boolean isNegative = cbNegative.isChecked();
+            String negMarksStr = etNegativeMarks.getText().toString().trim();
 
-            // VALIDATION
-            if (name.isEmpty()) {
-                Toast.makeText(this, "Enter category name", Toast.LENGTH_SHORT).show();
-                return;
-            }
-            if (timeStr.isEmpty()) {
-                Toast.makeText(this, "Enter time limit", Toast.LENGTH_SHORT).show();
+            if (name.isEmpty() || timeStr.isEmpty()) {
+                Toast.makeText(this, "Please fill required fields", Toast.LENGTH_SHORT).show();
                 return;
             }
 
             int timeLimit = Integer.parseInt(timeStr);
-            if (timeLimit < 1 || timeLimit > 60) {
-                Toast.makeText(this, "Time limit 1-60 minutes", Toast.LENGTH_SHORT).show();
-                return;
+            float negativeMarks = 0;
+            if (isNegative && !negMarksStr.isEmpty()) {
+                negativeMarks = Float.parseFloat(negMarksStr);
             }
 
-            createCategory(name, desc, timeLimit);  // 🔥 PASS TIME LIMIT
+            createCategory(name, desc, timeLimit, isNegative, negativeMarks);
         });
 
         builder.setNegativeButton("CANCEL", null);
@@ -200,21 +192,43 @@ public class CategoriesActivity extends AppCompatActivity {
     }
 
 
-    private void createCategory(String name, String desc, int timeLimit) {
-        String customId = name.toLowerCase().replaceAll("[^a-z0-9]", "");
+    private void createCategory(String name, String desc, int timeLimit, boolean isNegative, float negativeMarks) {
+        String formattedName = capitalizeWords(name);
+        String customId = formattedName.toLowerCase().replaceAll("[^a-z0-9]", "");
 
-        CategoryModel category = new CategoryModel(name, timeLimit);
-
-        // 🔥 USE customId as DOCUMENT ID!
-        db.collection("categories").document(customId)
-                .set(category)
-                .addOnSuccessListener(aVoid -> {
-                    Toast.makeText(this, name + " created! (" + customId + ")", Toast.LENGTH_SHORT).show();
-                    loadCategories();
-                });
+        db.collection("categories").document(customId).get().addOnSuccessListener(documentSnapshot -> {
+            if (documentSnapshot.exists()) {
+                Toast.makeText(this, "Category '" + formattedName + "' already exists!", Toast.LENGTH_SHORT).show();
+            } else {
+                CategoryModel category = new CategoryModel(formattedName, desc, timeLimit, isNegative, negativeMarks);
+                db.collection("categories").document(customId)
+                        .set(category)
+                        .addOnSuccessListener(aVoid -> {
+                            Toast.makeText(this, formattedName + " created! ✅", Toast.LENGTH_SHORT).show();
+                            loadCategories();
+                        })
+                        .addOnFailureListener(e -> {
+                            Toast.makeText(this, "Failed to create category", Toast.LENGTH_SHORT).show();
+                        });
+            }
+        });
     }
 
-
-
-
+    private String capitalizeWords(String input) {
+        if (input == null || input.isEmpty()) return input;
+        StringBuilder sb = new StringBuilder();
+        boolean capitalizeNext = true;
+        for (char c : input.toCharArray()) {
+            if (Character.isWhitespace(c)) {
+                capitalizeNext = true;
+                sb.append(c);
+            } else if (capitalizeNext) {
+                sb.append(Character.toUpperCase(c));
+                capitalizeNext = false;
+            } else {
+                sb.append(Character.toLowerCase(c));
+            }
+        }
+        return sb.toString();
+    }
 }

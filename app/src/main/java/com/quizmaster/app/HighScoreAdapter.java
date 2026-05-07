@@ -31,7 +31,10 @@ public class HighScoreAdapter extends RecyclerView.Adapter<HighScoreAdapter.View
                 + " [" + (model.category != null ? model.category : "N/A") + "]";
         
         holder.tvCategory.setText(displayText);
-        holder.tvScore.setText(model.score + " pts (" + model.percentage + "%)");
+        
+        // 🔥 FORMAT SCORE: Support float/negative marking display
+        String formattedScore = String.format("%.2f", model.score).replaceAll("\\.00$", "");
+        holder.tvScore.setText(formattedScore + " pts (" + model.percentage + "%)");
     }
 
     @Override

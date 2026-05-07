@@ -35,7 +35,11 @@ public class LeaderboardAdapter extends RecyclerView.Adapter<LeaderboardAdapter.
         
         holder.tvRank.setText(rankStr);
         holder.tvUsername.setText(score.username != null ? score.username : "Unknown");
-        holder.tvScore.setText(score.score + " pts (" + score.percentage + "%)");
+        
+        // 🔥 FORMAT SCORE: Support float/negative marking display
+        String formattedScore = String.format("%.2f", score.score).replaceAll("\\.00$", "");
+        holder.tvScore.setText(formattedScore + " pts (" + score.percentage + "%)");
+
         holder.tvCategory.setText(score.category != null ? score.category.toUpperCase() : "GENERAL");
     }
 
